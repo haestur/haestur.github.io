@@ -1,0 +1,12 @@
+Vagrant.configure(2) do |config|
+  config.vm.define "lesson2-vm-1" do |srv|
+    srv.vm.box = "centos/7"
+    srv.vm.synced_folder "./", "/vagrant"
+    srv.vm.hostname = "lesson2-vm-1"
+    srv.vm.network(:private_network, ip: "192.168.56.10")
+    srv.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = "1"
+    end
+  end
+end
