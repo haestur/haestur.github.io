@@ -1,0 +1,1 @@
+{"rsync":{"/vagrant":{"type":"rsync","guestpath":"/vagrant","hostpath":"/home/haestur/Documents/GitHub-repos/OTUS-linux-pro/Lesson-1","disabled":false,"__vagrantfile":true,"owner":"vagrant","group":"vagrant"}}}
