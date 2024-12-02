@@ -1,0 +1,16 @@
+server {
+        listen {{ nginx_listen_port }} default_server;
+        listen [::]:{{ nginx_listen_port }} default_server;
+
+        root /var/www/html;
+
+        server_name _;
+
+	index {{ nginx_index_html }};
+
+        location / {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                try_files $uri $uri/ =404;
+        }
+}

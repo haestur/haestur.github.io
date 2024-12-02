@@ -1,0 +1,63 @@
+---
+
+- hosts: web
+  name: Install and configure NGINX
+  vars:
+    nginx_listen_port: 8080
+    nginx_vhost_folder: /etc/nginx/sites-available
+    nginx_www_folder: /var/www/html
+    nginx_index_html: index_8080.html
+
+  tasks:
+    - name: update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+      tags:
+        - update-apt-cache
+
+    - name: install NGINX
+      ansible.builtin.apt:
+        name: nginx
+        state: latest
+      notify: 
+        - start nginx
+      tags:
+        - nginx-package
+
+    - name: enable nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        enabled: true
+
+    - name: copy template config file to {{ inventory_hostname }} 
+      ansible.builtin.template:
+        src: templates/vhost-otus.j2
+        dest: "{{ nginx_vhost_folder }}/vhost-otus"
+      notify: 
+        - create symlink for new configuration
+        - reload nginx
+      tags:
+        - copy-nginx-config
+
+    - name: copy index.html config
+      ansible.builtin.template:
+        src: templates/{{ nginx_index_html }}.j2
+        dest: "{{ nginx_www_folder }}/{{ nginx_index_html }}"
+
+  handlers:
+    - name: create symlink for new configuration
+      ansible.builtin.file:
+        src: "{{ nginx_vhost_folder }}/vhost-otus"
+        dest: /etc/nginx/sites-enabled/vhost-otus
+        state: link
+
+    - name: start nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: started
+
+    - name: reload nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: reloaded
+
