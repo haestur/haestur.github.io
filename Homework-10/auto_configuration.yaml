@@ -1,0 +1,112 @@
+---
+
+- hosts: all
+  name: otus lesson 12 homework
+  become: yes
+  vars: 
+    watchlog_sysconfig: /etc/sysconfig/watchlog
+    watchlog_log: /var/log/watchlog.log
+    watchlog_sh: /opt/watchlog.sh
+    watchlog_service: /etc/systemd/system/watchlog.service
+    watchlog_timer: /etc/systemd/system/watchlog.timer
+    spawn_fcgi_sysconfig: /etc/sysconfig/spawn-fcgi
+    spawn_fcgi_service: /etc/systemd/system/spawn-fcgi.service
+    apache_1_sysconfig: /etc/sysconfig/httpd-first
+    apache_2_sysconfig: /etc/sysconfig/httpd-second
+    apache_1_conf: /etc/httpd/conf/first.conf
+    apache_2_conf: /etc/httpd/conf/second.conf
+
+  tasks:
+    - name: copy watchlog sysconfig
+      ansible.builtin.template:
+        src: templates/watchlog_sysconfig.j2
+        dest: "{{ watchlog_sysconfig }}"
+
+    - name: copy log file
+      ansible.builtin.template:
+        src: templates/watchlog_log.j2
+        dest: "{{ watchlog_log }}"
+
+    - name: copy watchlog.sh
+      ansible.builtin.template:
+        src: templates/watchlog_sh.j2
+        dest: "{{ watchlog_sh }}"
+        mode: '0755'
+
+    - name: copy watchlog service
+      ansible.builtin.template:
+        src: templates/watchlog_service.j2
+        dest: "{{ watchlog_service }}"
+
+    - name: copy watchlog timer
+      ansible.builtin.template:
+        src: templates/watchlog_timer.j2
+        dest: "{{ watchlog_timer }}"
+
+    - name: start timer unit
+      ansible.builtin.systemd_service:
+        name: watchlog.timer
+        state: started
+
+    - name: start watchlog service 
+      ansible.builtin.systemd_service:
+        name: watchlog.service
+        state: started
+
+    - name: install spawn-fcgi and dependecies
+      ansible.builtin.yum:
+        name: 
+          - epel-release
+          - spawn-fcgi
+          - php
+          - php-cli
+        state: latest
+
+    - name: copy spawn-fcgi config
+      ansible.builtin.template:
+        src: templates/spawn_fcgi_sysconfig.j2
+        dest: "{{ spawn_fcgi_sysconfig }}"
+
+    - name: copy spawn-fcgi service
+      ansible.builtin.template:
+        src: templates/spawn_fcgi_service.j2
+        dest: "{{ spawn_fcgi_service }}"
+
+    - name: start spawn-fcgi service
+      ansible.builtin.systemd_service:
+        name: spawn-fcgi.service
+        state: started
+
+    - name: copy first apache sysconfig
+      ansible.builtin.template:
+        src: templates/apache_1_sysconfig.j2
+        dest: "{{ apache_1_sysconfig }}"
+
+    - name: copy second apache sysconfig
+      ansible.builtin.template:
+        src: templates/apache_2_sysconfig.j2
+        dest: "{{ apache_2_sysconfig }}"
+
+    - name: copy first apache config
+      ansible.builtin.template:
+        src: templates/apache_1_conf.j2
+        dest: "{{ apache_1_conf }}"
+
+    - name: copy second apache config
+      ansible.builtin.template:
+        src: templates/apache_2_conf.j2
+        dest: "{{ apache_2_conf }}"
+
+    - name: start first apache instance
+      ansible.builtin.systemd_service:
+        name: httpd@first.service
+        state: started
+
+    - name: start second apache instance
+      ansible.builtin.systemd_service:
+        name: httpd@second.service
+        state: started
+
+
+
+
