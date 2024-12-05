@@ -1,0 +1,71 @@
+---
+
+- hosts: all
+  name: configure backup client
+  become: yes
+  
+  tasks:
+    - name: update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+      tags:
+        - update-apt-cache
+
+    - name: install Borg Backup
+      ansible.builtin.apt:
+        name: borgbackup
+        state: latest
+      tags:
+        - borg-package
+
+    - name: copy public key
+      ansible.builtin.template:
+        src: templates/id_rsa.pub
+        dest: /root/.ssh/id_rsa.pub
+
+    - name: copy private key
+      ansible.builtin.template:
+        src: templates/id_rsa
+        dest: /root/.ssh/id_rsa
+        mode: '0600'
+
+    - name: disable StrictHostKeyChecking
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/ssh_config
+        regexp: 'StrictHostKeyChecking'
+        line: StrictHostKeyChecking no
+
+    - name: initialize borg repository
+      ansible.builtin.expect: 
+        command: borg init --encryption=repokey borg@192.168.56.160:my_repo
+        responses:
+          "Enter new passphrase:":
+            - "123123"
+          "Enter same passphrase again:":
+            - "123123"
+          "Do you want your passphrase to be displayed for verification?":
+            - "N"
+
+    - name: create systemd service for backup
+      ansible.builtin.template:
+        src: templates/borg-backup.service
+        dest: /etc/systemd/system/borg-backup.service
+
+    - name: create systemd timer for backup
+      ansible.builtin.template:
+        src: templates/borg-backup.timer
+        dest: /etc/systemd/system/borg-backup.timer
+
+    - name: enable borg-backup.timer
+      ansible.builtin.service:
+        name: borg-backup.timer
+        enabled: yes
+        state: started
+
+    - name: start borg-backup.service
+      ansible.builtin.service:
+        name: borg-backup.service
+        state: started
+
+
+

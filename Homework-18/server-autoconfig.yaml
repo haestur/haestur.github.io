@@ -1,0 +1,84 @@
+---
+
+- hosts: all
+  name: configure backup server
+  become: yes
+
+  tasks:
+    - name: update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+      tags:
+        - update-apt-cache
+
+    - name: install Borg Backup
+      ansible.builtin.apt:
+        name: borgbackup
+        state: latest
+      tags:
+        - borg-package
+
+    - name: create backup directory
+      ansible.builtin.file:
+        path: /var/backup
+        state: directory
+
+    - name: create a ext4 filesystem on backup storage /dev/sdc
+      filesystem:
+        fstype: ext4
+        dev: /dev/sdc
+
+    - name: add fstab entry for backup storage and mount it
+      ansible.posix.mount:      
+        path: /var/backup
+        src: /dev/sdc
+        fstype: ext4
+        state: mounted
+
+    - name: create borg user
+      ansible.builtin.user:
+        name: borg
+        home: /var/backup
+      tags:
+        - create-user-borg
+
+    - name: change /var/backup owner
+      ansible.builtin.file:
+        path: /var/backup
+        state: directory
+        recurse: yes
+        owner: borg
+        group: borg
+
+    - name: create .ssh directory for user borg
+      ansible.builtin.file:
+        path: /var/backup/.ssh
+        state: directory
+        mode: '0700'
+        owner: borg
+        group: borg
+    
+    - name: copy public key
+      ansible.builtin.template:
+        src: templates/id_rsa.pub
+        dest: /tmp/backupServer_id_rsa.pub
+
+    - name: get serverBackup public key
+      ansible.builtin.command: cat /tmp/backupServer_id_rsa.pub
+      register: serverPublicKey
+
+    - name: create authorized_keys file for user borg
+      ansible.builtin.file:
+        path: /var/backup/.ssh/authorized_keys
+        state: touch
+        mode: '0600'
+        owner: borg
+        group: borg
+
+    - name: add server public key to authorized_keys
+      ansible.builtin.lineinfile:
+        path: /var/backup/.ssh/authorized_keys
+        line: '{{serverPublicKey.stdout}}'
+
+
+
