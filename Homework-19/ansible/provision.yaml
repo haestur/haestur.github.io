@@ -1,0 +1,67 @@
+---
+
+- hosts: all
+  become: yes
+  name: otus lesson 28 
+
+  tasks:
+    - name: stop firewall ufw, if started
+      ansible.builtin.service:
+        name: ufw
+        state: stopped
+        enabled: no
+
+    - name: install traceroute
+      ansible.builtin.apt:
+        name: traceroute
+        state: present
+
+    - name: set up SNAT on inetRouter
+      ansible.builtin.iptables:
+        table: nat 
+        chain: POSTROUTING 
+        out_interface: eth0
+        jump: MASQUERADE
+      when: (ansible_hostname == "inetRouter")
+
+    - name: save current state of the firewall in system file
+      community.general.iptables_state:
+        state: saved
+        path: /etc/iptables.rules
+      when: (ansible_hostname == "inetRouter")
+
+    - name: copy sh script for iptables restoring after system boot
+      ansible.builtin.template: 
+        src: "templates/iptables-restore.sh"
+        dest: "/etc/network/if-pre-up.d/iptables"
+        owner: root
+        group: root
+        mode: "0755"
+      when: (ansible_hostname == "inetRouter")
+
+    - name: set up forward packages across routers
+      ansible.posix.sysctl:
+        name: net.ipv4.conf.all.forwarding
+        value: '1'
+        state: present
+      when: "'routers' in group_names"
+
+    - name: disable default route
+      ansible.builtin.template: 
+         src: templates/00-installer-config.yaml
+         dest: /etc/netplan/00-installer-config.yaml
+         owner: root
+         group: root
+         mode: 0644
+      when: (ansible_hostname != "inetRouter")
+
+    - name: add static routers to hosts
+      ansible.builtin.template:
+        src: "50-vagrant_{{ansible_hostname}}.yaml"
+        dest: /etc/netplan/50-vagrant.yaml
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: restart all hosts
+      ansible.builtin.reboot:
