@@ -1,7 +1,5 @@
 ## OTUS Linux Professional - Урок 19. Docker: основы работы с контейнеризацией.
 
-### OTUS Linux Professional Lesson #19 | Subject: Docker
-
 #### Цель домашнего задания:
 Разобраться с основами docker, с образом, эко системой docker в целом;
 
