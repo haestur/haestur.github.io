@@ -1,0 +1,137 @@
+---
+
+- name: Base set up
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: install software
+      ansible.builtin.apt:
+        name:
+          - openvpn
+          - iperf3
+          - easy-rsa
+        state: present
+        update_cache: true
+
+- name: set up host1 
+  hosts: host1
+  become: yes
+  tasks:
+
+    - name: generate static key
+      ansible.builtin.command: openvpn --genkey secret /etc/openvpn/static.key
+
+    - name: copy static key to vagrant directory
+      ansible.builtin.copy:
+        src: /etc/openvpn/static.key
+        dest: /vagrant/
+        remote_src: yes
+
+    - name: set up openvpn configuration
+      ansible.builtin.template:
+        src: templates/task1/host1.server.conf
+        dest: /etc/openvpn/server.conf
+
+    - name: set up openvpn systemd unit
+      ansible.builtin.template:
+        src: templates/task1/openvpn@.service
+        dest: /etc/systemd/system/openvpn@.service
+     
+    - name: start openvpn service
+      ansible.builtin.service:
+        name: openvpn@server
+        state: restarted
+        enabled: yes
+
+- name: set up host2
+  hosts: host2
+  become: yes
+  tasks:
+
+    - name: copy static key 
+      ansible.builtin.copy:
+        src: /vagrant/static.key
+        dest: /etc/openvpn/
+        remote_src: yes
+
+    - name: set up openvpn configuration
+      ansible.builtin.template:
+        src: templates/task1/host2.server.conf
+        dest: /etc/openvpn/server.conf
+
+    - name: set up openvpn systemd unit
+      ansible.builtin.template:
+        src: templates/task1/openvpn@.service
+        dest: /etc/systemd/system/openvpn@.service
+
+    - name: start openvpn service
+      ansible.builtin.service:
+        name: openvpn@server
+        state: restarted
+        enabled: yes
+
+- name: set up server
+  hosts: server
+  become: yes
+  tasks:
+
+    - name: init pki
+      ansible.builtin.command:
+        chdir: /etc/openvpn
+        cmd: /usr/share/easy-rsa/easyrsa init-pki
+
+    - name: generate keys for server
+      ansible.builtin.shell: |
+        echo "server" | /usr/share/easy-rsa/easyrsa build-ca nopass 
+        echo 'rasvpn' | /usr/share/easy-rsa/easyrsa gen-req server nopass
+        echo 'yes' | /usr/share/easy-rsa/easyrsa sign-req server server
+        /usr/share/easy-rsa/easyrsa gen-dh
+        openvpn --genkey secret ca.key
+      args:
+        chdir: /etc/openvpn
+
+    - name: generate keys for client
+      ansible.builtin.shell: |
+        echo 'client' | /usr/share/easy-rsa/easyrsa gen-req client nopass 
+        echo 'yes' | /usr/share/easy-rsa/easyrsa sign-req client client 
+        cp /etc/openvpn/pki/issued/client.crt /vagrant
+        cp /etc/openvpn/pki/private/client.key /vagrant 
+        cp /etc/openvpn/pki/ca.crt /vagrant 
+      args:
+        chdir: /etc/openvpn
+
+    - name: set up openvpn configuration
+      ansible.builtin.template:
+        src: templates/task2/server.conf
+        dest: /etc/openvpn/server.conf
+
+    - name: create clinet configuration
+      ansible.builtin.template:
+        src: templates/task2/client_iroute
+        dest: /etc/openvpn/client/client
+
+    - name: start openvpn service
+      ansible.builtin.service:
+        name: openvpn@server
+        state: restarted
+        enabled: yes
+
+- name: set up client
+  hosts: client
+  become: yes
+  tasks:
+
+    - name: set up openvpn configuration
+      ansible.builtin.template:
+        src: templates/task2/client.conf
+        dest: /etc/openvpn/client.conf
+
+    - name: copy pki keys
+      ansible.builtin.shell: |
+        cp /vagrant/client.crt /etc/openvpn
+        cp /vagrant/client.key /etc/openvpn
+        cp /vagrant/ca.crt /etc/openvpn
+
+    
+
