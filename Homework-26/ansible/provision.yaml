@@ -1,0 +1,94 @@
+---
+
+- name: Base set up
+  hosts: all
+  become: yes
+  tasks:
+  
+    - name: modify repos
+      shell: |
+        sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+        sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+        sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+    
+    - name: install softs on CentOS
+      yum:
+        name:
+          - vim
+          - chrony
+        state: present
+        update_cache: true
+  
+    - name: disable firewalld
+      service:
+        name: firewalld
+        state: stopped
+        enabled: false
+  
+    - name: disable SElinux
+      selinux:
+        state: disabled
+  
+    - name: disable SElinux now
+      shell: setenforce 0
+
+    - name: Set up timezone
+      timezone:
+        name: "Europe/Moscow"
+  
+    - name: enable chrony
+      service:
+        name: chronyd
+        state: restarted
+        enabled: true
+  
+- name: set up server
+  hosts: ipa.otus.lan 
+  become: yes
+  tasks:
+    - name: change /etc/hosts
+      template:
+        src: templates/server_hosts.j2
+        dest: /etc/hosts
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: install freeipa
+      yum:
+        name:
+          - '@idm:DL1'
+          - 'ipa-server'
+
+    - name: enable ipv6 on lo interface
+      ansible.posix.sysctl:
+        name: net.ipv6.conf.lo.disable_ipv6
+        value: '0'
+        state: present
+        sysctl_set: true
+
+    - name: set up ipa
+      shell: echo -e "no\nyes"| ipa-server-install --hostname=ipa.otus.lan --domain=otus.lan --realm=OTUS.LAN --ds-password=otus2024 --admin-password=otus2024 --netbios-name=OTUS --no-ntp
+
+
+- name: set up clients
+  hosts: client1.otus.lan,client2.otus.lan
+  become: yes
+  tasks:
+    - name: change /etc/hosts
+      template:
+        src: templates/client_hosts.j2
+        dest: /etc/hosts
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: install module ipa-client
+      yum:
+        name:
+          - freeipa-client
+        state: present
+        update_cache: true
+  
+    - name: add host to ipa-server
+      shell: echo -e "yes\nyes" | ipa-client-install --mkhomedir --domain=OTUS.LAN --server=ipa.otus.lan --no-ntp -p admin -w otus2024
